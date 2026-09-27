@@ -1,0 +1,21 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect KumaFlow Brain",
+        "description": "Enter the brain address and a token. The token comes from the `BRAIN_API_TOKEN` env var of the `backend` service, or from Settings → API tokens in the brain web UI. Buttons require an `admin` scope token.",
+        "data": {
+          "url": "Brain address",
+          "token": "Token",
+          "user_id": "User ID (for the My Wave button)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect. Check the address, the token, and that the brain is running."
+    },
+    "abort": {
+      "already_configured": "This brain address is already configured."
+    }
+  }
+}

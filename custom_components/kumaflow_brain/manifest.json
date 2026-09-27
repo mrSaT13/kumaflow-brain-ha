@@ -1,0 +1,14 @@
+{
+  "domain": "kumaflow_brain",
+  "name": "KumaFlow Brain",
+  "codeowners": ["@mrSaT13"],
+  "config_flow": true,
+  "dependencies": [],
+  "after_dependencies": ["http"],
+  "documentation": "https://github.com/mrSaT13/kumaflow-brain",
+  "integration_type": "hub",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/mrSaT13/kumaflow-brain/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

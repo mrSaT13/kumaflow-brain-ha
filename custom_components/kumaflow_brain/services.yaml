@@ -1,0 +1,73 @@
+generate_daily:
+  name: Сгенерировать дневной плейлист
+  description: >
+    Пересоздать KumaFlow Daily. Синхронная операция, занимает до нескольких
+    минут. Нужна как ручная страховка, если крон не сработал.
+  fields:
+    n:
+      name: Размер
+      description: Сколько треков положить в плейлист
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 100
+          step: 5
+          unit_of_measurement: треков
+          mode: box
+
+my_wave:
+  name: Сгенерировать мою волну
+  description: >
+    Получить новую подборку «Моя волна» без ожидания и вернуть её
+    в атрибуты ответа сервиса.
+  fields:
+    count:
+      name: Сколько треков
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 5
+          max: 50
+          step: 5
+          unit_of_measurement: треков
+          mode: box
+    mood:
+      name: Настроение
+      required: false
+      selector:
+        select:
+          options:
+            - label: авто
+              value: ""
+            - label: спокойное
+              value: calm
+            - label: энергичное
+              value: energetic
+            - label: грустное
+              value: sad
+            - label: весёлое
+              value: happy
+    activity:
+      name: Занятие
+      required: false
+      selector:
+        text:
+
+start_scan:
+  name: Запустить сканирование
+  description: Ручной запуск сканирования библиотеки.
+  fields:
+    kind:
+      name: Что сканировать
+      required: false
+      default: library
+      selector:
+        select:
+          options:
+            - label: Библиотека
+              value: library
+            - label: Sonic-анализ
+              value: analysis

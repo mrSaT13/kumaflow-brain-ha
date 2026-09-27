@@ -1,0 +1,13 @@
+# Кэш Python, который HA создаст при первом запуске
+__pycache__/
+*.py[cod]
+
+# Локальные настройки HA
+config.yaml
+.secrets.yaml
+automations.yaml
+scripts.yaml
+scenes.yaml
+
+# Отчёты проверок
+check-report.txt
