@@ -101,8 +101,43 @@ async def async_setup_entry(
     data = hass.data[DOMAIN][entry.entry_id]
     client: BrainClient = data["client"]
     user_id: str | None = data.get(CONF_USER_ID)
+    is_admin: bool = bool(entry.data.get(CONF_TOKEN_IS_ADMIN))
 
-    entities: list[ButtonEntity] = [
+    # Кнопки запуска задач в мозге помечены require_admin
+    # (server/app/api/scan.py:98-156). Без админского токена они дают
+    # 403 при каждом нажатии, поэтому не создаём их вовсе: отсутствие
+    # кнопки понятнее, чем кнопка, которая всегда падает.
+    if is_admin:
+        entities: list[ButtonEntity] = [
+            BrainButton(
+                hass,
+                entry,
+                client,
+                "scan_library",
+                "Сканировать библиотеку",
+                "mdi:folder-search",
+                "/api/scan/library",
+            ),
+            BrainButton(
+                hass,
+                entry,
+                client,
+                "run_analysis",
+                "Запустить sonic-анализ",
+                "mdi:waveform",
+                "/api/scan/analysis",
+            ),
+        ]
+    else:
+        _LOG.warning(
+            "Кнопки запуска задач не созданы: токен без прав админа. "
+            "Укажи BRAIN_API_TOKEN из окружения сервиса backend мозга."
+        )
+        entities = []
+
+    # Дневной плейлист: generate-daily НЕ помечен require_admin,
+    # поэтому кнопка работает с обычным токеном.
+    entities.append(
         BrainButton(
             hass,
             entry,
@@ -112,26 +147,8 @@ async def async_setup_entry(
             "mdi:playlist-plus",
             "/api/playlists/generate-daily",
             json_body={"n": 30},
-        ),
-        BrainButton(
-            hass,
-            entry,
-            client,
-            "scan_library",
-            "Сканировать библиотеку",
-            "mdi:folder-search",
-            "/api/scan/library",
-        ),
-        BrainButton(
-            hass,
-            entry,
-            client,
-            "run_analysis",
-            "Запустить sonic-анализ",
-            "mdi:waveform",
-            "/api/scan/analysis",
-        ),
-    ]
+        )
+    )
 
     # Волна требует user_id. Без него кнопка бессмысленна, поэтому
     # создаём её только если пользователь выбран в настройках.

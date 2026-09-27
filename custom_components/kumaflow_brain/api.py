@@ -78,6 +78,28 @@ class BrainClient:
     async def health(self) -> dict[str, Any]:
         return await self.request("GET", "/api/health")
 
+    async def probe_admin(self) -> bool:
+        """Есть ли у токена права админа. Без побочных эффектов.
+
+        В мозге require_admin проверяет поле is_admin, а оно True ТОЛЬКО
+        у BRAIN_API_TOKEN из окружения (server/app/core/auth.py:60, 129).
+        Токен из веб-интерфейса админом не станет никогда, даже если у
+        него в скоупах написано admin.
+
+        Проба идёт на GET /api/settings/tokens: роутер settings помечен
+        require_admin (api/settings.py:12), а путь не открытый — значит
+        обычный токен получит 403, а админский 200 со списком. Метод
+        ничего не меняет, в отличие от всех admin-POST в scan.py.
+        """
+        try:
+            await self.request("GET", "/api/settings/tokens")
+        except BrainError as err:
+            if "403" in str(err):
+                return False
+            # Другая ошибка — это не про права, а про связь
+            raise
+        return True
+
     async def scan_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         """Последние запуски. Формат ответа — {runs: [...]}."""
         data = await self.request("GET", f"/api/scan/runs?limit={limit}")

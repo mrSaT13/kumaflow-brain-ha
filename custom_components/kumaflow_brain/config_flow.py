@@ -11,7 +11,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 
 from .api import BrainClient, BrainError
-from .const import CONF_TOKEN, CONF_URL, CONF_USER_ID, DOMAIN
+from .const import CONF_TOKEN, CONF_TOKEN_IS_ADMIN, CONF_URL, CONF_USER_ID, DOMAIN
 
 _LOG = logging.getLogger(__name__)
 
@@ -43,28 +43,43 @@ class BrainConfigFlow(ConfigFlow, domain=DOMAIN):
             client = BrainClient(url, token, session)
 
             try:
-                health = await client.health()
+                await client.health()
             except BrainError as err:
                 _LOG.debug("Проверка соединения не удалась: %s", err)
                 errors["base"] = "cannot_connect"
-            else:
-                # Токен без прав админа пройдёт /health, но кнопки и
-                # запуск скана потом упрутся в 403. Поэтому заранее
-                # предупреждаем, но настройку не блокируем.
-                if not _has_admin(health):
-                    _LOG.warning(
-                        "Токен прошёл проверку, но не выглядит админским. "
-                        "Кнопки запуска и просмотр чужих профилей могут быть недоступны."
-                    )
-                await self.async_set_unique_id(url)
-                self._abort_if_unique_id_configured()
-                return self.async_create_entry(
-                    title=f"KumaFlow Brain ({_host_of(url)})",
-                    data={CONF_URL: url, CONF_TOKEN: token, CONF_USER_ID: user_id},
+                return self.async_show_form(
+                    step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
                 )
 
-            return self.async_show_form(
-                step_id="user", data_schema=STEP_USER_SCHEMA, errors=errors
+            # Проверяем права сразу, на настройке. Кнопки запуска задач
+            # требуют админского токена, и без проверки пользователь
+            # узнаёт об этом только при нажатии — из сообщения "403",
+            # которое ни о чём не говорит.
+            try:
+                is_admin = await client.probe_admin()
+            except BrainError as err:
+                _LOG.debug("Не удалось определить права: %s", err)
+                is_admin = False
+
+            await self.async_set_unique_id(url)
+            self._abort_if_unique_id_configured()
+
+            if not is_admin:
+                _LOG.warning(
+                    "Токен без прав админа: кнопки запуска задач будут "
+                    "возвращать 403. Нужен BRAIN_API_TOKEN из окружения "
+                    "сервиса backend мозга — токены из веб-интерфейса "
+                    "админом не являются (server/app/core/auth.py)."
+                )
+
+            return self.async_create_entry(
+                title=f"KumaFlow Brain ({_host_of(url)})",
+                data={
+                    CONF_URL: url,
+                    CONF_TOKEN: token,
+                    CONF_USER_ID: user_id,
+                    CONF_TOKEN_IS_ADMIN: is_admin,
+                },
             )
 
         return self.async_show_form(step_id="user", data_schema=STEP_USER_SCHEMA)
@@ -73,23 +88,3 @@ class BrainConfigFlow(ConfigFlow, domain=DOMAIN):
 def _host_of(url: str) -> str:
     cleaned = url.replace("http://", "").replace("https://", "").strip("/")
     return cleaned or url
-
-
-def _has_admin(health: dict[str, Any]) -> bool:
-    """/health в мозгу (server/app/api/status.py:7) может отдавать роль.
-
-    Если поля нет — считаем, что всё в порядке: отсутствие информации
-    не повод блокировать настройку.
-    """
-    if not isinstance(health, dict):
-        return True
-    for key in ("role", "scope", "scopes", "is_admin", "admin"):
-        if key in health:
-            value = health[key]
-            if isinstance(value, bool):
-                return value
-            if isinstance(value, str):
-                return value.lower() in ("admin", "true", "1")
-            if isinstance(value, (list, tuple)):
-                return "admin" in {str(v).lower() for v in value}
-    return True

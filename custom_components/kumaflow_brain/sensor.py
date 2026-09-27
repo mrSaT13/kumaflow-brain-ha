@@ -18,13 +18,14 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE
+from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import DOMAIN, active_run, latest_run, progress_pct
 from .const import (
+    CONF_TOKEN_IS_ADMIN,
     CONF_USER_ID,
     PHASE_ANALYSIS,
     PHASE_CLAP,
@@ -68,18 +69,39 @@ class BrainSensorBase(CoordinatorEntity):
         self._attr_suggested_object_id = f"kf_{key}"
 
     @property
+    def _runs(self) -> list[dict]:
+        """Прогоны СВЕЖИЕ, а не снимок на момент создания.
+
+        Раньше список читался один раз в __init__ и больше не
+        обновлялся: координатор копит новые данные, а сенсоры держали
+        старые. Правильно — читать из координатора на каждый доступ.
+        """
+        data = getattr(self.coordinator, "data", None) or {}
+        runs = data.get("runs")
+        return runs if isinstance(runs, list) else []
+
+    @property
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, self._entry.entry_id)},
             "name": f"KumaFlow Brain {self._entry.title}",
             "manufacturer": "KumaFlow",
             "model": "Brain",
+            # Иконка устройства: гарантированно отрисуется mdi.
+            # Ссылку на свой PNG в device_info не ставим — HA покажет
+            # пустой белый квадрат, если путь не resolвится. Брендовый
+            # знак виден в HACS и на плитке интеграции.
+            "icon": "mdi:music-note-bell",
             "sw_version": (self.coordinator.data or {}).get("health", {}).get("version"),
         }
 
     @property
     def available(self) -> bool:
-        return super().available and bool(self.coordinator.data)
+        # Только признак успешного обновления от координатора.
+        # Если данных нет — сенсор покажет «неизвестно», а не
+        # «недоступен»: это разные состояния, и «недоступен» здесь
+        # вводит в заблуждение.
+        return super().available
 
 
 class BrainRunProgress(BrainSensorBase, SensorEntity):
@@ -192,6 +214,38 @@ class BrainHealthSensor(BrainSensorBase, SensorEntity):
         return 1 if self.coordinator.data else 0
 
 
+class BrainTokenAdminSensor(BrainSensorBase, SensorEntity):
+    """Есть ли у токена права админа.
+
+    Показывает, почему кнопки запуска задач не работают: у мозга
+    require_admin пропускает ТОЛЬКО BRAIN_API_TOKEN из окружения
+    (server/app/core/auth.py:60,129). Токен из веб-интерфейса админом
+    не является, даже со скоупом admin. Без этого сенсора причина
+    видна только в тексте ошибки 403.
+    """
+
+    _attr_icon = "mdi:shield-key"
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+
+    @property
+    def native_value(self) -> str:
+        return "admin" if self._entry.data.get(CONF_TOKEN_IS_ADMIN) else "limited"
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        admin = bool(self._entry.data.get(CONF_TOKEN_IS_ADMIN))
+        return {
+            "can_start_jobs": admin,
+            "can_generate_daily": True,
+            "hint": (
+                "BRAIN_API_TOKEN из окружения сервиса backend мозга"
+                if admin
+                else "Кнопки запуска задач недоступны: нужен BRAIN_API_TOKEN "
+                "из окружения сервиса backend, а не токен из веб-интерфейса"
+            ),
+        }
+
+
 # Полные ключи объявлены строками, а не собираются из фазы. Иначе их
 # невозможно сверить с icons/icon.json — а именно эту сверку делает
 # check.py, раздел 5. Три ключа на фазу: прогресс, статус, завершён.
@@ -244,6 +298,7 @@ async def async_setup_entry(
 
     entities: list[SensorEntity] = [
         BrainHealthSensor(coordinator, entry, "health", "Доступность"),
+        BrainTokenAdminSensor(coordinator, entry, "token_is_admin", "Права токена"),
         BrainLibraryCount(coordinator, entry, "tracks", "Треков в библиотеке"),
     ]
 

@@ -2,37 +2,40 @@
   "services": {
     "generate_daily": "service:kumaflow_brain.generate_daily",
     "my_wave": "service:kumaflow_brain.my_wave",
-    "start_scan": "service:kumaflow_brain.start_scan",
-    "trigger_daily": "button:kumaflow_brain.generate_daily",
-    "trigger_scan_library": "button:kumaflow_brain.scan_library",
-    "trigger_run_analysis": "button:kumaflow_brain.run_analysis",
-    "trigger_my_wave": "button:kumaflow_brain.my_wave"
+    "start_scan": "service:kumaflow_brain.start_scan"
   },
   "entity": {
     "sensor": {
-      "health": {"name": "Доступность"},
-      "tracks": {"name": "Треков в библиотеке"},
-      "library_progress": {"name": "Сканирование библиотеки: прогресс"},
-      "library_status": {"name": "Сканирование библиотеки: статус"},
-      "library_finished": {"name": "Сканирование библиотеки: завершён"},
-      "analysis_progress": {"name": "Sonic-анализ: прогресс"},
-      "analysis_status": {"name": "Sonic-анализ: статус"},
-      "analysis_finished": {"name": "Sonic-анализ: завершён"},
-      "clap_progress": {"name": "CLAP-эмбеддинги: прогресс"},
-      "clap_status": {"name": "CLAP-эмбеддинги: статус"},
-      "clap_finished": {"name": "CLAP-эмбеддинги: завершён"},
-      "lyrics_progress": {"name": "Тексты треков: прогресс"},
-      "lyrics_status": {"name": "Тексты треков: статус"},
-      "lyrics_finished": {"name": "Тексты треков: завершён"},
-      "clusters_progress": {"name": "Кластеры: прогресс"},
-      "clusters_status": {"name": "Кластеры: статус"},
-      "clusters_finished": {"name": "Кластеры: завершён"}
+      "health": { "default": "mdi:heart-pulse" },
+      "tracks": { "default": "mdi:music-note-multiple" },
+
+      "library_progress": { "default": "mdi:folder-search" },
+      "library_status": { "default": "mdi:state-machine" },
+      "library_finished": { "default": "mdi:clock-check" },
+
+      "analysis_progress": { "default": "mdi:waveform" },
+      "analysis_status": { "default": "mdi:state-machine" },
+      "analysis_finished": { "default": "mdi:clock-check" },
+
+      "clap_progress": { "default": "mdi:brain" },
+      "clap_status": { "default": "mdi:state-machine" },
+      "clap_finished": { "default": "mdi:clock-check" },
+
+      "lyrics_progress": { "default": "mdi:file-document-outline" },
+      "lyrics_status": { "default": "mdi:state-machine" },
+      "lyrics_finished": { "default": "mdi:clock-check" },
+
+      "clusters_progress": { "default": "mdi:scatter-plot" },
+      "clusters_status": { "default": "mdi:state-machine" },
+      "clusters_finished": { "default": "mdi:clock-check" },
+
+      "token_is_admin": { "default": "mdi:shield-key" }
     },
     "button": {
-      "generate_daily": {"name": "Сгенерировать дневной плейлист"},
-      "scan_library": {"name": "Сканировать библиотеку"},
-      "run_analysis": {"name": "Запустить sonic-анализ"},
-      "my_wave": {"name": "Сгенерировать мою волну"}
+      "generate_daily": { "default": "mdi:playlist-plus" },
+      "scan_library": { "default": "mdi:folder-search" },
+      "run_analysis": { "default": "mdi:waveform" },
+      "my_wave": { "default": "mdi:waves" }
     }
   }
 }
