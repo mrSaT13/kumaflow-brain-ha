@@ -15,11 +15,11 @@ from typing import Any
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
-    SensorEntityDescription,
+    SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE
-from homeassistant.core import HomeAssistant, callback
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -85,8 +85,13 @@ class BrainSensorBase(CoordinatorEntity):
 class BrainRunProgress(BrainSensorBase, SensorEntity):
     """Прогресс активного прогона: процент и «идёт / не идёт»."""
 
-    _attr_device_class = SensorDeviceClass.PROGRESS
+    # DeviceClass для процента в HA НЕ существует: SensorDeviceClass —
+    # это enum, и члена PROGRESS в нём нет. Задание выдуманного имени
+    # роняет импорт всего модуля sensor.py, а с ним и все сенсоры.
+    # Поэтому просто единица измерения без device_class, как и делают
+    # встроенные интеграции для процентов выполнения.
     _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:progress-upload"
 
     def __init__(self, coordinator, entry, key, name, phase) -> None:
@@ -96,6 +101,7 @@ class BrainRunProgress(BrainSensorBase, SensorEntity):
     @property
     def _run(self) -> dict | None:
         return active_run(self._runs, self._phase) or latest_run(self._runs, self._phase)
+
     @property
     def native_value(self) -> float | None:
         run = self._run
@@ -165,7 +171,7 @@ class BrainLibraryCount(BrainSensorBase, SensorEntity):
     """Всего треков в библиотеке."""
 
     _attr_icon = "mdi:music-note-multiple"
-    _attr_state_class = "measurement"
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     @property
     def native_value(self) -> int | None:
