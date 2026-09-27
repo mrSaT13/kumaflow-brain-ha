@@ -87,12 +87,12 @@ class BrainSensorBase(CoordinatorEntity):
             "name": f"KumaFlow Brain {self._entry.title}",
             "manufacturer": "KumaFlow",
             "model": "Brain",
-            # Иконка устройства: гарантированно отрисуется mdi.
-            # Ссылку на свой PNG в device_info не ставим — HA покажет
-            # пустой белый квадрат, если путь не resolвится. Брендовый
-            # знак виден в HACS и на плитке интеграции.
-            "icon": "mdi:music-note-bell",
             "sw_version": (self.coordinator.data or {}).get("health", {}).get("version"),
+            # "icon" в device_info НЕ поддерживается:
+            # DeviceRegistry.async_get_or_create() бросает
+            # TypeError: unexpected keyword argument 'icon'.
+            # Иконку устройства HA подставляет сама по домену
+            # интеграции, отдельного ключа для неё нет.
         }
 
     @property

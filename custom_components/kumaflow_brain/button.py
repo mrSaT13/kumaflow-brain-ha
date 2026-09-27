@@ -25,7 +25,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from . import DOMAIN
 from .api import BrainClient, BrainError
-from .const import CONF_USER_ID
+from .const import CONF_TOKEN_IS_ADMIN, CONF_USER_ID
 
 _LOG = logging.getLogger(__name__)
 
