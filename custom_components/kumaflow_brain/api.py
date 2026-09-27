@@ -1,7 +1,7 @@
 """Асинхронный клиент API KumaFlow Brain.
 
 Эндпоинты сверены с kumaflow-brain-main 0.2.4:
-  GET  /api/status/health            server/app/api/status.py:7
+  GET  /api/health            server/app/api/status.py:7
   GET  /api/scan/runs                server/app/api/scan.py
   POST /api/scan/library             запуск сканирования библиотеки
   POST /api/scan/analysis            запуск sonic-анализа
@@ -76,7 +76,7 @@ class BrainClient:
     # --- служебное -------------------------------------------------------
 
     async def health(self) -> dict[str, Any]:
-        return await self.request("GET", "/api/status/health")
+        return await self.request("GET", "/api/health")
 
     async def scan_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         """Последние запуски. Формат ответа — {runs: [...]}."""

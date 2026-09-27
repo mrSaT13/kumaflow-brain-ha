@@ -120,7 +120,7 @@ Settings → API tokens.
 
 > **A token with the `admin` scope is required.** Configuration will be
 > saved with a regular token too — the connection check uses
-> `/api/status/health`, which anyone may call. But the buttons write
+> `/api/health`, which anyone may call. But the buttons write
 > and will return `403`.
 
 `User ID` is only needed for the My Wave button. Take it from the wave
@@ -214,7 +214,7 @@ KumaFlow Brain web UI uses. Endpoints used:
 
 | Endpoint | Purpose |
 |---|---|
-| `GET /api/status/health` | connection check, availability sensor |
+| `GET /api/health` | connection check, availability sensor |
 | `GET /api/scan/runs` | progress and status of background jobs |
 | `POST /api/scan/library` | scan button |
 | `POST /api/scan/analysis` | analysis button |
@@ -238,7 +238,7 @@ used. It takes minutes, hence the 600 s client timeout.
 ## Requirements
 
 - Home Assistant **2024.8** or newer
-- KumaFlow Brain with a reachable `GET /api/status/health`
+- KumaFlow Brain with a reachable `GET /api/health`
 - A token with the `admin` scope, for the buttons
 
 No extra dependencies: uses `aiohttp` from the HA core.
