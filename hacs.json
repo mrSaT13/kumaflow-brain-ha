@@ -3,5 +3,6 @@
   "render_readme": true,
   "hide_default_branch": true,
   "homeassistant": "2024.8.0",
-  "zip_release": false
+  "zip_release": false,
+  "brand_icon": "https://raw.githubusercontent.com/mrSaT13/kumaflow-brain-ha/main/icon.png"
 }
