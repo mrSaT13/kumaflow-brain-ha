@@ -2,23 +2,31 @@
 
 Что даёт:
   * сенсоры прогресса сканирования библиотеки и sonic-анализа
-  * кнопки ручного запуска дневного плейлиста и волны
-  * кнопки запуска сканирования и анализа
+  * кнопки ручного запуска дневного плейлиста, волны и задач
+  * прогресс CLAP-эмбеддингов, текстов треков и кластеризации
 
-Установка описана в README рядом, но коротко: скопировать папку
-kumaflow_brain в config/custom_components/ и перезагрузить HA, либо
-подключить репозиторий через HACS.
+Структура координатора сделана подклассом, а не через update_method:
+  * update_method вызывается как await self.update_method(), БЕЗ
+    аргументов — функция с параметром hass роняет настройку с
+    "missing 1 required positional argument";
+  * подкласс держит клиента у себя, поэтому первый опрос не зависит
+    от порядка записи в hass.data. При update_method пришлось бы сначала
+    наполнить hass.data, а потом обновляться, иначе первый опрос падает.
+
+Клиент лежит на координаторе, а не в hass.data[DOMAIN][entry_id] ещё и
+потому, что при нескольких записях (несколько адресов мозга) каждый
+координатор работает со своим адресом, а не с первым попавшимся.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
+from typing import Any
 
-import aiohttp
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_create_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
@@ -30,26 +38,47 @@ _LOG = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BUTTON]
 
 
+class BrainCoordinator(DataUpdateCoordinator[dict[str, Any]]):
+    """Опрашивает мозг и раздаёт результат платформам."""
+
+    def __init__(self, hass: HomeAssistant, client: BrainClient, entry: ConfigEntry) -> None:
+        super().__init__(
+            hass,
+            _LOG,
+            # Имя с entry_id: при двух записях их не спутать в логах
+            name=f"{DOMAIN} {entry.entry_id[:8]}",
+            update_interval=timedelta(seconds=DEFAULT_SCAN_INTERVAL),
+        )
+        self._client = client
+        self._entry = entry
+
+    async def _async_update_data(self) -> dict[str, Any]:
+        """Один опрос: доступность + последние запуски задач.
+
+        HA сам вызывает этот метод, аргументов не передаёт. Любое
+        BrainError превращаем в UpdateFailed, иначе HA покажет
+        «Unexpected error» вместо понятного «не удалось обновить».
+        """
+        try:
+            health, runs = await self._client.health(), await self._client.scan_runs(limit=20)
+        except BrainError as err:
+            # Отдаём текст ошибки, а не голую строку: по нему видно,
+            # это 404, 401 или таймаут — три разные причины
+            raise UpdateFailed(f"Ошибка связи с KumaFlow Brain: {err}") from err
+
+        return {"health": health or {}, "runs": runs or []}
+
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     session = async_create_clientsession(hass)
     client = BrainClient(entry.data[CONF_URL], entry.data[CONF_TOKEN], session)
 
-    coordinator = DataUpdateCoordinator(
-        hass,
-        _LOG,
-        name=DOMAIN,
-        update_interval=None,  # заполним после первого успешного опроса
-        update_method=_async_update,
-    )
+    coordinator = BrainCoordinator(hass, client, entry)
 
-    try:
-        await coordinator.async_config_entry_first_refresh()
-    except BrainError as err:
-        raise ConfigEntryNotReady from err
-
-    # Секунды положить в update_interval, а не задавать в конструкторе:
-    # так первый опрос происходит сразу, без лишнего ожидания
-    coordinator.update_interval = DEFAULT_SCAN_INTERVAL
+    # Первый опрос делаем сразу: если мозг недоступен, запись встанет в
+    # ожидание и HA покажет «Не удалось настроить. Повторная попытка»
+    # вместо молчаливых пустых сенсоров
+    await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {
         "client": client,
@@ -64,36 +93,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
-        hass.data[DOMAIN].pop(entry.entry_id, None)
+        hass.data.get(DOMAIN, {}).pop(entry.entry_id, None)
     return unloaded
-
-
-async def _async_update(hass: HomeAssistant) -> dict:
-    """Один опрос: здоровье + последние запуски сканирований."""
-    entry_data = _current(hass)
-    client: BrainClient = entry_data["client"]
-
-    try:
-        health, runs = await client.health(), await client.scan_runs(limit=20)
-    except BrainError as err:
-        raise UpdateFailed(f"Ошибка связи с KumaFlow Brain: {err}") from err
-
-    return {"health": health, "runs": runs or []}
-
-
-def _current(hass: HomeAssistant) -> dict:
-    """Данные единственной записи. Интеграция заточена на один мозг."""
-    entries = hass.data.get(DOMAIN, {})
-    if not entries:
-        raise UpdateFailed("Нет загруженных записей KumaFlow Brain")
-    return next(iter(entries.values()))
 
 
 def active_run(runs: list[dict], phase: str) -> dict | None:
     """Наиболее свежий незавершённый запуск указанной фазы.
 
     scan_runs.status принимает queued/running/done/error
-    (server/app/db/models.py:430-441).
+    (server/app/db/models.py:430-441, сверено с исходниками).
     """
     for run in runs:
         if run.get("phase") == phase and run.get("status") in ("queued", "running"):
@@ -115,8 +123,11 @@ def progress_pct(run: dict) -> float | None:
     total_items = 0 у только что созданного прогона, делить нельзя —
     возвращаем None, чтобы UI показал «нет данных», а не 0 %.
     """
-    total = int(run.get("total_items") or 0)
-    done = int(run.get("processed_items") or 0)
+    try:
+        total = int(run.get("total_items") or 0)
+        done = int(run.get("processed_items") or 0)
+    except (TypeError, ValueError):
+        return None
     if total <= 0:
         return None
-    return round(done * 100.0 / total, 1)
+    return round(min(done, total) * 100.0 / total, 1)
